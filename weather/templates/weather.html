@@ -1,0 +1,187 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🌦️ Weather App</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 40px;
+            color: #333;
+        }
+
+        .weather-box {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 30px;
+            border-radius: 15px;
+            display: inline-block;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0b7dda;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        body.sunny {
+            background: url("{% static 'images/sunny.jpg' %}") no-repeat center center/cover;
+        }
+        body.cloudy {
+            background: url("{% static 'images/cloudy.jpg' %}") no-repeat center center/cover;
+        }
+        body.rain {
+            background: url("{% static 'images/rain.jpg' %}") no-repeat center center/cover;
+        }
+        body.default {
+            background-color: #f2f2f2;
+        }
+        body.dark {
+            background-color: #121212;
+            color: white;
+        }
+        body.dark .weather-box {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+    </style>
+</head>
+<body class="{% if weather %}{{ weather.weather_class }}{% else %}default{% endif %}">
+    <h1>🌤️ Weather App</h1>
+
+    <label><input type="checkbox" id="themeToggle"> 🌙 Dark Mode</label>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Check Weather</button>
+        <div class="loader" id="loader"></div>
+    </form>
+
+    {% if weather %}
+    <div class="weather-box" id="weatherBox">
+        <h2>{{ weather.city }}, {{ weather.country }}</h2>
+        <img src="{{ weather.icon }}" alt="weather icon">
+        <p><strong>{{ weather.temperature }}°C</strong></p>
+        <p>{{ weather.description }}</p>
+        <p>💨 Wind: {{ weather.wind }} kph</p>
+        <p>🕒 {{ now|date:"H:i" }} | 📅 {{ now|date:"D, M j, Y" }}</p>
+
+        <p><strong>Tip:</strong>
+            {% if weather.weather_class == 'rain' %}☔ Carry an umbrella!
+            {% elif weather.weather_class == 'sunny' %}🧴 Wear sunscreen!
+            {% elif weather.weather_class == 'cloudy' %}☁️ Great day for coffee!
+            {% else %}🌈 Stay prepared!
+            {% endif %}
+        </p>
+
+        <button onclick="downloadWeather()">Download Report</button>
+    </div>
+
+    {% if weather.forecast %}
+    <div class="weather-box">
+        <h3>📅 3-Day Forecast</h3>
+        <div style="display: flex; justify-content: space-around; gap: 20px;">
+            {% for day in weather.forecast %}
+            <div style="text-align: center;">
+                <p><strong>{{ day.date }}</strong></p>
+                <img src="{{ day.icon }}" width="48">
+                <p>{{ day.temp }}°C</p>
+                <p>{{ day.description }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <canvas id="forecastChart" width="400" height="200"></canvas>
+    </div>
+    {% endif %}
+    {% elif error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <script>
+        // Spinner
+        document.querySelector("form").addEventListener("submit", () => {
+            document.getElementById("loader").style.display = "block";
+        });
+
+        // Theme toggle
+        document.getElementById("themeToggle").addEventListener("change", function () {
+            document.body.classList.toggle("dark", this.checked);
+        });
+
+        // Download weather as image
+        function downloadWeather() {
+            html2canvas(document.querySelector('#weatherBox')).then(canvas => {
+                let link = document.createElement('a');
+                link.download = 'weather_report.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        // Forecast chart
+        {% if weather.forecast %}
+        const labels = [{% for day in weather.forecast %}"{{ day.date }}",{% endfor %}];
+        const temps = [{% for day in weather.forecast %}{{ day.temp }},{% endfor %}];
+
+        new Chart(document.getElementById('forecastChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Forecast Temp (°C)',
+                    data: temps,
+                    fill: false,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
